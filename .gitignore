@@ -1,0 +1,23 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# VS Code
+.vscode/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Unity runtime files
+unity/PRS-Env.exe
+unity/PRS-Env_Data/
+unity/MonoBleedingEdge/
+unity/UnityPlayer.dll
+unity/UnityCrashHandler64.exe
+unity/PRS-Env_BurstDebugInformation_DoNotShip/
+
+# OS
+.DS_Store
+Thumbs.db
