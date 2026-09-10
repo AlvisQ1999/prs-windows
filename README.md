@@ -1,94 +1,215 @@
-[//]: # (# PRS-Test)
-# Human-centered In-building Embodied Delivery Benchmark
-## [PRS Challenge](https://prsorg.github.io/challenge) hosted on [CVPR 2024 Embodied AI Workshop](https://embodied-ai.org/)
+# PRS on Windows
 
-## Quick Start & Installation
+Windows-compatible reproduction of the  
+**Human-centered In-building Embodied Delivery Benchmark (PRS)**.
 
-Follow these steps to quickly set up and run the PRS delivery task version:
+This repository is based on the official PRS delivery benchmark and contains the modifications required to run the environment on Windows.
 
-1. Clone the PRS delivery repository:  
+## Original Project
+
+- Official repository: https://github.com/PRS-Organization/prs-delivery
+- PRS Challenge: https://prsorg.github.io/challenge
+- CVPR 2024 Embodied AI Workshop: https://embodied-ai.org/
+- Unity environment: https://huggingface.co/datasets/xzq1999/prs-env
+
+PRS provides an indoor embodied delivery environment containing multi-floor spaces, human NPCs, objects, robot navigation, visual perception, manipulation, and natural-language delivery tasks.
+
+---
+## Requirements
+
+The project uses:
+
+- Windows 11
+- Python `3.9`
+- The project virtual environment `.venv`
+- Unity executable in `unity/`
+
+The currently verified baseline versions include:
+
+```text
+openai==2.48.0
+httpx==0.27.2
+torch==2.0.1
+torchvision==0.15.2
+transformers==4.40.2
+typing_extensions==4.16.0
 ```
-git clone https://github.com/PRS-Organization/prs-delivery.git
-```  
-2. Ensure you have a Python virtual environment (Python version >= 3.9) activated.
 
+`torch==2.0.1` and `torchvision==0.15.2` are the matching PyTorch versions used by
+the baseline. The tested local environment uses CPU builds.
+
+Create or activate the project environment, then install the pinned requirements:
+
+```powershell
+cd D:\BUAA\03Research\Robotic\PRS\prs-delivery-main
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r .\prs_requirements.txt
+python -m pip check
 ```
-conda create -n prs python=3.9
-conda activate mvp
+
+Always use the `.venv` interpreter explicitly when there is any doubt:
+
+```powershell
+.\.venv\Scripts\python.exe -m pip check
 ```
 
-3. Install the required Python packages:  
+The first import of `robot.object_detection` may download
+`IDEA-Research/grounding-dino-tiny` from Hugging Face. The model is cached in
+the standard Hugging Face cache under the current user's profile.
+
+## Unity Setup
+
+Download the PRS Unity executable from the official PRS distribution page and
+extract it into the repository's `unity/` directory:
+
+https://docs.google.com/forms/d/e/1FAIpQLScrk25iSnnmOH8cj4eqD8lcALcj1Cx1bSiiTsw9q9DzvWnCig/viewform?usp=sf_link
+
+For this Windows checkout, keep the existing compatibility paths:
+
+```text
+Unity executable:
+./unity/PRS-Env.exe
+
+Unity data:
+unity/PRS-Env_Data/StreamingAssets/...
 ```
-pip install -r prs_requirements.txt
+
+`PrsEnv(start_up_mode=1, rendering=1)` starts the Windows Unity executable
+automatically and opens the Unity window. `PrsEnv(start_up_mode=0)` expects
+Unity to be started manually first.
+
+The existing Windows compatibility fix in
+`env/npc_control.py` must also be preserved: `random_walk()` passes world
+coordinates in the order `pos[0], pos[1], pos[2]`.
+
+## LLM Configuration
+
+`robot/llm_process.py` uses the OpenAI Python SDK Responses API:
+
+```python
+client.responses.create(...)
 ```
-4. Download the Unity executable file (for Ubuntu, Windows, and Mac) from [PRS executable program](https://docs.google.com/forms/d/e/1FAIpQLScrk25iSnnmOH8cj4eqD8lcALcj1Cx1bSiiTsw9q9DzvWnCig/viewform?usp=sf_link). If you are using the macOS or Windows version, you need to modify some of the environment data paths in ```StreamingAssets``` folder and executable application paths.
 
-5. Extract the `PRS_Ubuntu_x.x.x.zip` file into the `unity` folder:  
+The current local configuration is an OpenAI-compatible endpoint and model
+defined in that file. Configure the provider's API key there only for local
+testing. Never put a real API key in this README, a committed source file,
+`.env` file, or any authentication file.
+
+The current local endpoint and model are:
+
+```text
+base_url = https://api2.xcodecli.com/v1
+model = gpt-5.5
 ```
-cd unity
-unzip PRS_Ubuntu_0.3.0.zip
-```   
-Note that the contents after unzipping should be placed in `unity` folder, and give `unity` folder file permissions:  
+
+The current SDK requirement is:
+
+```text
+openai==2.48.0
 ```
-sudo chmod 777 -R unity
+
+The old SDK requirement is retained as a comment in `prs_requirements.txt`:
+
+```text
+# openai==1.30.5
 ```
-6. Start running the demo:  
+
+Do not downgrade to `openai==1.30.5` when using `client.responses.create(...)`;
+that SDK does not provide the `responses` client.
+
+## Test LLM Connectivity
+
+Run the text-only test before starting Unity or a delivery task:
+
+```powershell
+.\.venv\Scripts\python.exe -u .\llm_test.py
 ```
-python prs_demo.py
-```     
-or start with only unity application: 
-``` 
-bash ./unity/start.sh 
+
+A successful result looks like:
+
+```text
+LLM response: '...'
 ```
-7. If you encounter a port occupation error, clean up occupied ports:  
+
+This test imports Grounding DINO because `robot.llm_process` initializes it,
+but it does not start Unity and does not run a delivery task.
+
+## Run The Interactive Demo
+
+Start the official interactive demo with:
+
+```powershell
+.\.venv\Scripts\python.exe .\prs_demo.py
 ```
-bash clean_port.sh
+
+The Unity window can be controlled manually. The project demo uses the
+keyboard controls provided by the PRS environment for camera, robot, and
+simulation-speed control.
+
+To close a programmatic run, call `prs.finish_env()`. If a process is
+interrupted, verify that no old `PRS-Env.exe` or Python PRS server is still
+using port `8000` before starting another run.
+
+## Run One Delivery Task
+
+Edit `TASK_ID` in `task_test.py` to select a task from:
+
+```text
+task/dataset/deliver_task_test_set.json
 ```
-8. Manual start: class initialization parameter is ```PrsEnv(start_up_mode=0)```, after running the Python script, you can open another terminal and execute ```unity/start.sh``` or directly run `unity/PRS.x86_64`.
 
-9. Runing on the headless server without rendering initialization ```PrsEnv(rendering=0)```.
+Then run:
 
-10. Wait a few seconds for Unity to render the graphics. In Unity, you can control the camera movement using the keyboard keys W, A, S, D, Q, and E. Robot control using the keyboard keys I R, F J, O P, K L, G H, N M, Z X, V B. Switch perspectives using C, accelerate time using numeric keypad 123456789.
-
-11. To close the demo, first close the Unity program (or press Esc), then stop the Python program (Ctrl+C or Ctrl+Z), and finally run:  
- ```
-bash clean_port.sh
- ```  
-Note: Or use ```prs.finish_env()``` to end PRS environment in Python script.
-
-12. To get started with the Delivery Task Dataset, simply run the following command in your terminal:
-
+```powershell
+.\.venv\Scripts\python.exe -u .\task_test.py
 ```
-python task_evaluation.py
+
+The current runner:
+
+1. Starts Unity automatically.
+2. Imports one task.
+3. Runs the baseline with trace output.
+4. Prints LLM and multimodal responses.
+5. Evaluates the task.
+6. Closes Unity in the `finally` block.
+
+The runner installs a 30-second repeating Python stack trace so that long
+navigation or Unity-response waits can be located. It does not impose a
+global task timeout. Stop a run with `Ctrl+C` if it makes no progress, then
+check and clean any remaining Unity or port-8000 processes.
+
+## Run Dataset Evaluation
+
+The dataset file contains 918 delivery tasks. The official scaffold is:
+
+```powershell
+.\.venv\Scripts\python.exe -u .\task_evaluation.py
 ```
-This will initiate the evaluation process using delivery task dataset.
 
-## Baseline Method
+At the current checkout, the call to `delivery_execution(...)` inside
+`task_evaluation.py` is commented out. Therefore this script currently loads
+tasks and evaluates the environment scaffold without running the baseline.
+Do not use it as the first LLM or baseline test.
 
-If you want to run baseline method, please install ```transformers==4.40.2 ```, ```torch==2.0.1```, ```openai==1.30.5```. And fill in the API-key in the ```robot\llm_process.py```.
-We utilize [Grounding DINO](https://github.com/IDEA-Research/GroundingDINO) to achieve zero-shot object detection with text prompt, you can replace it with others, e.g. [Grounded SAM](https://github.com/IDEA-Research/Grounded-Segment-Anything).
+For a baseline test, use `task_test.py` first. After the single-task path is
+validated, enable the baseline call in `task_evaluation.py` only when a full
+918-task run is intended. A full run starts one Unity environment and may take
+a long time.
 
-Make```delivery_execution(prs, instruction, npc_information)``` available in ```task_evaluation.py``` on line 20.
+## Evaluation Notes
 
-The main process of the baseline method is in ```./robot/baseline.py```, ```./robot/object_detection.py``` is visual detection, and ```./robot/llm_process.py``` is the LMM and LLM application. 
+The PRS evaluator checks whether the correct target object is grasped, whether
+the target person is found, and whether the robot is sufficiently close to the
+person while carrying the correct object. `delivery_task_evaluate(...)` also
+releases a carried object while collecting the final evaluation state.
 
-Save the result and submit the ```result.json``` to [Eval AI leaderboard](https://eval.ai/web/challenges/challenge-page/2313/overview).
+The baseline may complete language parsing and multimodal scene checks while
+still failing later navigation, object selection, grasping, or NPC approach.
+Always inspect the printed task result instead of treating Unity process
+termination alone as task success.
 
-## More API Guidance
-[PRS Platform API](document/api.md)
+## References
 
-
-
-[//]: # (input your API key for LLM service)
-
-[//]: # (download vision model for object detect)
-
-[//]: # (python task evaluation py)
-
-[//]: # (save the result &#40;save=1&#41;)
-
-[//]: # (submit the json to Eval AI leaderboard)
-
-[//]: # (cite us contact us project homepage)
-
-[//]: # (long term leaderboard for delivery)
+- PRS project: https://github.com/PRS-Organization/prs-delivery
+- Grounding DINO: https://github.com/IDEA-Research/GroundingDINO
+- PRS Platform API: `document/api.md`

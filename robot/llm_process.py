@@ -1,71 +1,132 @@
-# import openai
-from matplotlib import pyplot as plt
-from openai import OpenAI
-# from zhipuai import ZhipuAI
-import cv2
 import base64
 import io
-from PIL import Image, ImageDraw
+
+import cv2
+from PIL import Image
+from matplotlib import pyplot as plt
+from openai import OpenAI
+
 from robot.object_detection import *
 
 
+# ============================================================
+# XCodeCLI API
+# ============================================================
+
 client = OpenAI(
-#     api_key=os.environ.get("OPENAI_API_KEY")
+    api_key="sk-",
+    base_url="https://api2.xcodecli.com/v1"
 )
+
+MODEL = "gpt-5.5"
+
+
+# ============================================================
+# Grounding DINO
+# ============================================================
+
 grounding_dino = GroundingDino()
 
 
-def object_detect_module(image, text='the human'):
-    if text[-1] != '.':
-        text = text + '.'
+def object_detect_module(image, text="the human"):
+    if text[-1] != ".":
+        text = text + "."
+
     result = grounding_dino.predict(image, text)
+
     return result
 
 
+# ============================================================
+# Vision + Language Model
+# ============================================================
+
 def lmm_interaction(content, image):
+    """
+    GPT-5.5 multimodal request through XCodeCLI Responses API.
+    """
+
     image = Image.fromarray(image)
+
     image_file = io.BytesIO()
-    image.save(image_file, format='PNG')
-    encoded_string = base64.b64encode(image_file.getvalue()).decode()
-    response = client.chat.completions.create(
-        model="gpt-4o",  # Fill in the name of the model that needs to be called
-        messages=[
+    image.save(image_file, format="PNG")
+
+    encoded_string = base64.b64encode(
+        image_file.getvalue()
+    ).decode("utf-8")
+
+    image_url = f"data:image/png;base64,{encoded_string}"
+
+    response = client.responses.create(
+        model=MODEL,
+        input=[
             {
                 "role": "user",
                 "content": [
                     {
-                        "type": "text",
+                        "type": "input_text",
                         "text": content
                     },
                     {
-                        "type": "image_url",
-                        "image_url": {
-                        "url": f"data:image/jpeg;base64,{encoded_string}"
-                      }
+                        "type": "input_image",
+                        "image_url": image_url
                     }
                 ]
             }
-        ],
-        max_tokens=300
+        ]
     )
-    res = response.choices[0].message.content
-    return res
+
+    result = response.output_text
+
+    if result is None:
+        result = ""
+
+    print("[LMM RESPONSE]:", repr(result))
+
+    return result
 
 
-def llm_interaction(content='Hello World!', temperature=0.9):
-    response = client.chat.completions.create(
-        model="gpt-4-turbo",  #   gpt-3.5-turbo-0125
-        messages=[
-            {"role": "user", "content": content}
-        ],
+# ============================================================
+# Text-only LLM
+# ============================================================
+
+def llm_interaction(content="Hello World!", temperature=0.9):
+    """
+    GPT-5.5 text request through XCodeCLI Responses API.
+
+    temperature is kept only to stay compatible with
+    the original PRS function signature.
+    """
+
+    response = client.responses.create(
+        model=MODEL,
+        input=content
     )
-    res = response.choices[0].message.content
-    return res
+
+    result = response.output_text
+
+    if result is None:
+        result = ""
+
+    print("[LLM RESPONSE]:", repr(result))
+
+    return result
 
 
-if __name__ == '__main__':
-    im = cv2.imread('example.jpg')
-    # print(im.shape)
-    mat = object_detect_module(im, 'the water bottle.')
-    plt.imshow(mat)
-    plt.show()
+# ============================================================
+# Original Grounding DINO demo
+# ============================================================
+
+if __name__ == "__main__":
+    im = cv2.imread("example.jpg")
+
+    if im is None:
+        print("example.jpg not found.")
+    else:
+        mat = object_detect_module(
+            im,
+            "the water bottle."
+        )
+
+        plt.imshow(mat)
+        plt.show()

@@ -9,13 +9,21 @@ import cv2
 
 class GroundingDino(object):
     def __init__(self):
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.processor = AutoProcessor.from_pretrained("IDEA-Research/grounding-dino-tiny")
         self.model = GroundingDinoForObjectDetection.from_pretrained("IDEA-Research/grounding-dino-tiny")
+        self.model.to(self.device)
+        self.model.eval()
 
     def predict(self, rgb_image, text):
         image = Image.fromarray(rgb_image)
         inputs = self.processor(images=image, text=text, return_tensors="pt")
-        outputs = self.model(**inputs)
+        inputs = {
+            key: value.to(self.device) if hasattr(value, "to") else value
+            for key, value in inputs.items()
+        }
+        with torch.no_grad():
+            outputs = self.model(**inputs)
         # convert outputs (bounding boxes and class logits) to COCO API
         target_sizes = torch.tensor([image.size[::-1]])
         results = self.processor.image_processor.post_process_object_detection(
